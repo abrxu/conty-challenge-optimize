@@ -1,5 +1,5 @@
-import type { DatabaseSync } from "node:sqlite";
-import { describe, expect, it } from "vitest";
+import { DatabaseSync } from "node:sqlite";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.ts";
 import { deliveriesSince } from "../src/clock.ts";
 import { getQueryCount, openDatabase, resetQueryCount } from "../src/db.ts";
@@ -222,5 +222,20 @@ describe("Critério: no máximo 8 queries por página de 20, independente do vol
     resetQueryCount();
     await fetchPage(app, CAMPAIGN_ID, 20, total + 10);
     expect(getQueryCount()).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("Critério: o acesso ao banco continua passando por src/db.ts", () => {
+  it("toda query da página é preparada por all/get de src/db.ts", async () => {
+    const { app } = seeded(2000, 7);
+    const prepare = vi.spyOn(DatabaseSync.prototype, "prepare");
+    try {
+      resetQueryCount();
+      await fetchPage(app, CAMPAIGN_ID, 20, 0);
+      expect(prepare.mock.calls.length).toBeGreaterThan(0);
+      expect(prepare.mock.calls.length).toBe(getQueryCount());
+    } finally {
+      prepare.mockRestore();
+    }
   });
 });
